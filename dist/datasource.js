@@ -45,7 +45,7 @@ System.register(['lodash'], function (_export, _context) {
           this.backendSrv = backendSrv;
           this.templateSrv = templateSrv;
           this.withCredentials = instanceSettings.withCredentials;
-          this.headers = { 'Content-Type': 'application/json' };
+          this.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
           if (typeof instanceSettings.basicAuth === 'string' && instanceSettings.basicAuth.length > 0) {
             this.headers['Authorization'] = instanceSettings.basicAuth;
           }
@@ -55,19 +55,41 @@ System.register(['lodash'], function (_export, _context) {
           key: 'query',
           value: function query(options) {
             var query = this.buildQueryParameters(options);
-            query.targets = query.targets.filter(function (t) {
-              return !t.hide;
-            });
+            // query.targets = query.targets.filter(t => !t.hide);
+            //
+            // if (query.targets.length <= 0) {
+            //   return this.q.when({data: []});
+            // }
 
-            if (query.targets.length <= 0) {
-              return this.q.when({ data: [] });
-            }
-
+            //     var result = [
+            //   {
+            //     "columns":[
+            //       {"text":"ID","type":"string"},
+            //       {"text":"Title","type":"string"}
+            //     ],
+            //     "rows":[],
+            //     "type":"table"
+            //   }
+            // ];
+            var result = [{
+              "datapoints": [],
+              "type": "docs",
+              "targets": "docs",
+              "filterable": true
+            }];
             return this.doRequest({
-              url: this.url + '/query',
+              url: this.url + '/select?wt=json&indent=on',
               data: query,
               method: 'POST'
+            }).then(function (response) {
+              _.map(response.data.response.docs, function (doc, i) {
+                result[0].datapoints.push(doc);
+              });
+
+              return { data: result };
             });
+
+            // return {data: [{datapoints: [{id: 1, title: "test"}], type: "docs", targets: "docs", filterable: true}]};
           }
         }, {
           key: 'testDatasource',
@@ -111,30 +133,14 @@ System.register(['lodash'], function (_export, _context) {
             var interpolated = {
               target: this.templateSrv.replace(query, null, 'regex')
             };
-
-            return this.doRequest({
-              url: this.url + '/search',
-              data: interpolated,
-              method: 'POST'
-            }).then(this.mapToTextValue);
-          }
-        }, {
-          key: 'mapToTextValue',
-          value: function mapToTextValue(result) {
-            return _.map(result.data, function (d, i) {
-              if (d && d.text && d.value) {
-                return { text: d.text, value: d.value };
-              } else if (_.isObject(d)) {
-                return { text: d, value: i };
-              }
-              return { text: d, value: d };
-            });
+            return [{ text: "*:*", value: "*:*" }];
           }
         }, {
           key: 'doRequest',
           value: function doRequest(options) {
             options.withCredentials = this.withCredentials;
             options.headers = this.headers;
+            // options.data = "q=*:*&fl=id,title,content&wt=json&indent=on";
 
             return this.backendSrv.datasourceRequest(options);
           }
@@ -147,19 +153,15 @@ System.register(['lodash'], function (_export, _context) {
             options.targets = _.filter(options.targets, function (target) {
               return target.target !== 'select metric';
             });
-
-            var targets = _.map(options.targets, function (target) {
-              return {
-                target: _this.templateSrv.replace(target.target, options.scopedVars, 'regex'),
-                refId: target.refId,
-                hide: target.hide,
-                type: target.type || 'timeserie'
-              };
+            options.targets = options.targets.filter(function (t) {
+              return !t.hide;
             });
 
-            options.targets = targets;
+            var targets = _.map(options.targets, function (target) {
+              return _this.templateSrv.replace(target.target, options.scopedVars);
+            });
 
-            return options;
+            return "&q=".concat(targets.join(" OR "));
           }
         }]);
 

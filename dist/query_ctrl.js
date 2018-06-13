@@ -68,7 +68,7 @@ System.register(['app/plugins/sdk', './css/query-editor.css!'], function (_expor
 
           _this.scope = $scope;
           _this.target.target = _this.target.target || 'select metric';
-          _this.target.type = _this.target.type || 'timeserie';
+          _this.target.type = _this.target.type || 'table';
           return _this;
         }
 
